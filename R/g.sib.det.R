@@ -3,8 +3,10 @@ g.sib.det = function(M,IMP,I,twd=c(-12,12),anglethreshold = 5,
                       dayborder=0, myfun=c()) {
   #==============================================================
   perc = 0.1; inbedthreshold = 15; bedblocksize = 30; outofbedsize = 60 # default configurations (keep hardcoded for now
+  library(ggplot2) # for DEBUG plotting only
+  library(gridExtra) # for DEBUG plotting only
 
-  sptwindow_HDCZA = function(angle, k =60, perc = 0.1, inbedthreshold = 15,
+  sptwindow_HDCZA = function(block, idx_start, idx_end, angle, k =60, perc = 0.1, inbedthreshold = 15,
                              bedblocksize = 30, outofbedsize = 60, ws3 = 5, constrain2range = FALSE) {
     medabsdi = function(angle) {
       angvar = stats::median(abs(diff(angle))) #50th percentile, do not use mean because that will be outlier dependent
@@ -66,6 +68,39 @@ g.sib.det = function(M,IMP,I,twd=c(-12,12),anglethreshold = 5,
       sptwindow_HDCZA_start = c()
       tib.threshold = c()
     }
+    
+    # Debug plots for HDCZA sleep detection
+    #browser()
+    nomov_fix = nomov[2:length(nomov)-2]
+    df <- data.frame(x,nomov_fix,inbedtime2)
+    df$idx <- 1:length(x)
+    p1 <- ggplot(data=df,aes(x=idx,y=x)) + geom_line(color='blue')
+    p1 <- p1 + geom_hline(yintercept=pp, linetype="dashed", color = "red") + 
+      ggtitle(paste('Detection Period:',block)) +
+      xlab('24hr chunk of data sent to HDCZA algo [5min intervals]') +
+      ylab('Abs-diff angle-z [5min med]') + 
+      annotate(geom="text", x=500, y=max(df$x)*0.95, label=paste('Start idx:',idx_start),hjust=0) +
+      annotate(geom="text", x=500, y=max(df$x)*0.85, label=paste('End idx:',idx_end),hjust=0)
+    
+    p3 <- ggplot(data=df,aes(x=idx,y=x)) + geom_area(color='blue')
+    p3 <- p3 + geom_hline(yintercept=pp, linetype="dashed", color = "red") + 
+      ggtitle(paste('Zoomed in graph to view movement detection thres:',round(pp,4))) +
+      xlab('24hr chunk of data sent to HDCZA algo [5min intervals]') +
+      ylab('Abs-diff angle-z') +
+      ylim(0,4)
+      
+    p2 <- ggplot() +
+      geom_line(data=df,aes(x=idx,y=nomov_fix, color='blue'), size=1.25) +
+      geom_line(data=df,aes(x=idx,y=inbedtime2, color='red'),size=3,alpha=0.75) +
+      ylab('Decision [0/1]') +
+      xlab('24hr chunk of data sent to HDCZA algo [5min intervals]') +
+      scale_color_discrete(name=' ',labels=c('1 = no-mvmt','1 = in bed')) +
+      theme(legend.position = 'top')
+
+    grid.arrange(p1,p3,p2)
+    
+    
+    
     tib.threshold = pp
     invisible(list(sptwindow_HDCZA_start=sptwindow_HDCZA_start,
                    sptwindow_HDCZA_end=sptwindow_HDCZA_end, tib.threshold=tib.threshold))
@@ -197,6 +232,9 @@ g.sib.det = function(M,IMP,I,twd=c(-12,12),anglethreshold = 5,
     }
     #-------------------------------------------------------------------
     # detect midnights
+    
+    # DEBUG PLOT:
+    pdf("sleep_detection_debug_plots.pdf", onefile = TRUE)
 
     detemout = g.detecmidnight(time,desiredtz, dayborder) # ND,
     midnights=detemout$midnights
@@ -221,7 +259,7 @@ g.sib.det = function(M,IMP,I,twd=c(-12,12),anglethreshold = 5,
         # Estimate Sleep Period Time Window, because this will be used by g.part4 if sleeplog is not available
         tmpANGLE = angle[qqq1:qqq2]
         tmpTIME = time[qqq1:qqq2]
-        inbedout = sptwindow_HDCZA(tmpANGLE,ws3=ws3,constrain2range=constrain2range,
+        inbedout = sptwindow_HDCZA(block = '1 midnight',idx_start=qqq1,idx_end=qqq2,tmpANGLE,ws3=ws3,constrain2range=constrain2range,
                                    perc = perc, inbedthreshold = inbedthreshold, bedblocksize = bedblocksize,
                                    outofbedsize = outofbedsize)
         if (length(inbedout$sptwindow_HDCZA_end) != 0 & length(inbedout$sptwindow_HDCZA_start) != 0) {
@@ -232,7 +270,7 @@ g.sib.det = function(M,IMP,I,twd=c(-12,12),anglethreshold = 5,
             if (newqqq2 > length(angle)) newqqq2 = length(angle)
             # only try to extract SPT again if it is possible to extrat a window of more than there is more than 23 hour
             if (newqqq1 < length(angle) & (newqqq2 - newqqq1) > (23*(3600/ws3)) ) {
-              inbedout = sptwindow_HDCZA(angle[newqqq1:newqqq2],ws3=ws3,constrain2range=constrain2range,
+              inbedout = sptwindow_HDCZA(block = '1 midnight re-run ',idx_start=newqqq1,idx_end=newqqq2,angle[newqqq1:newqqq2],ws3=ws3,constrain2range=constrain2range,
                                          perc = perc, inbedthreshold = inbedthreshold, bedblocksize = bedblocksize,
                                          outofbedsize = outofbedsize)
               if (inbedout$sptwindow_HDCZA_start+newqqq1 >= newqqq2) {
@@ -307,7 +345,7 @@ g.sib.det = function(M,IMP,I,twd=c(-12,12),anglethreshold = 5,
           tmpANGLE = angle[qqq1:qqq2]
           tmpTIME = time[qqq1:qqq2]
           daysleep_offset = 0
-          inbedout = sptwindow_HDCZA(tmpANGLE,ws3=ws3,constrain2range=constrain2range,
+          inbedout = sptwindow_HDCZA(block='noon to noon',idx_start=qqq1,idx_end=qqq2,tmpANGLE,ws3=ws3,constrain2range=constrain2range,
                                      perc = perc, inbedthreshold = inbedthreshold,
                                      bedblocksize = bedblocksize, outofbedsize = outofbedsize)
           if (length(inbedout$sptwindow_HDCZA_end) != 0 & length(inbedout$sptwindow_HDCZA_start) != 0) {
@@ -319,7 +357,7 @@ g.sib.det = function(M,IMP,I,twd=c(-12,12),anglethreshold = 5,
               if (newqqq2 > length(angle)) newqqq2 = length(angle)
               # only try to extract SPT again if it is possible to extrat a window of more than there is more than 23 hour
               if (newqqq1 < length(angle) & (newqqq2 - newqqq1) > (23*(3600/ws3)) ) {
-                inbedout = sptwindow_HDCZA(angle[newqqq1:newqqq2],ws3=ws3,constrain2range=constrain2range,
+                inbedout = sptwindow_HDCZA(block='6pm to 6pm',idx_start=newqqq1,idx_end=newqqq2,angle[newqqq1:newqqq2],ws3=ws3,constrain2range=constrain2range,
                                            perc = perc, inbedthreshold = inbedthreshold, bedblocksize = bedblocksize,
                                            outofbedsize = outofbedsize)
                 if (inbedout$sptwindow_HDCZA_start+newqqq1 >= newqqq2) {
@@ -348,6 +386,11 @@ g.sib.det = function(M,IMP,I,twd=c(-12,12),anglethreshold = 5,
       cat("No midnights found")
       detection.failed = TRUE
     }
+    
+    # DEBUG PLOTTING ONLY
+    dev.off()
+    
+    
     metatmp = data.frame(time,invalid,night=night,sleep = sleep, stringsAsFactors = T)
   } else {
     metatmp =c()

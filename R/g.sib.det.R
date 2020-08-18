@@ -70,11 +70,11 @@ g.sib.det = function(M,IMP,I,twd=c(-12,12),anglethreshold = 5,
     }
     
     # Debug plots for HDCZA sleep detection
-    browser()
+    #browser()
     nomov_fix = nomov[2:length(nomov)-2]
     df <- data.frame(x,nomov_fix,inbedtime2)
     df$idx <- 1:length(x)
-    browser()
+    #browser()
     # code to try to get time on x-axis.. not working yet:
     #df$time <- seq.POSIXt(as.POSIXct(substr(start_time,1,19), format = '%Y-%m-%dT%H:%M:%S'),by=5,length.out=length(x))
     #p1 <- ggplot(data=df,aes(x=time,y=x)) + geom_line(color='blue')
@@ -84,12 +84,11 @@ g.sib.det = function(M,IMP,I,twd=c(-12,12),anglethreshold = 5,
       xlab('24hr chunk of data sent to HDCZA algo [5min intervals]') +
       ylab('Abs-diff angle-z [5min med]') + 
       annotate(geom="text", x=500, y=max(df$x)*0.95, label=paste('Start idx:',idx_start),hjust=0) +
-      annotate(geom="text", x=500, y=max(df$x)*0.85, label=paste('End idx:',idx_end),hjust=0) +
-      scale_x_datetime(labels=format('%H'))
-    print(p1)
-    browser()
+      annotate(geom="text", x=500, y=max(df$x)*0.85, label=paste('End idx:',idx_end),hjust=0)
+    #print(p1)
+    #browser()
     
-    p3 <- ggplot(data=df,aes(x=idx,y=x)) + geom_area(color='blue')
+    p3 <- ggplot(data=df,aes(x=idx,y=x)) + geom_line(color='blue')
     p3 <- p3 + geom_hline(yintercept=pp, linetype="dashed", color = "red") + 
       ggtitle(paste('Zoomed in graph to view movement detection thres:',round(pp,4))) +
       xlab('24hr chunk of data sent to HDCZA algo [5min intervals]') +
@@ -352,7 +351,7 @@ g.sib.det = function(M,IMP,I,twd=c(-12,12),anglethreshold = 5,
           tmpANGLE = angle[qqq1:qqq2]
           tmpTIME = time[qqq1:qqq2]
           daysleep_offset = 0
-          browser()
+          #browser()
           inbedout = sptwindow_HDCZA(start_time = tmpTIME[qqq1], block='noon to noon',idx_start=qqq1,idx_end=qqq2,tmpANGLE,ws3=ws3,constrain2range=constrain2range,
                                      perc = perc, inbedthreshold = inbedthreshold,
                                      bedblocksize = bedblocksize, outofbedsize = outofbedsize)
